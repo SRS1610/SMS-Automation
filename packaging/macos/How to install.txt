@@ -1,0 +1,44 @@
+SMS Automation for Mac
+======================
+
+Install
+-------
+1. Drag "SMS Automation" onto the Applications folder in this window.
+2. Open your Applications folder and double-click "SMS Automation".
+
+The first time you open it
+--------------------------
+This app isn't signed with an Apple Developer ID, so macOS blocks it the first
+time:
+
+  - macOS 15 (Sequoia) and later: macOS says it can't verify the app. Click
+    "Done", open System Settings > Privacy & Security, scroll down, click
+    "Open Anyway" next to SMS Automation, and confirm.
+  - macOS 14 and earlier: right-click (or Control-click) the app, choose
+    "Open", then click "Open" in the dialog.
+
+You only need to do this once.
+
+Using it
+--------
+- The dashboard opens in your web browser at http://127.0.0.1:47821
+- Sending continues in the background when you close the browser tab.
+  Double-click the app again to reopen the dashboard.
+- To stop it, click "Quit app" at the bottom of the sidebar.
+- Sending only happens while the app is running and your Mac is awake.
+  To start it automatically, add it in System Settings > General > Login Items.
+- Only this Mac can reach the dashboard.
+
+Your data
+---------
+Settings, gateway credentials (encrypted) and campaign history are stored in:
+  ~/Library/Application Support/SMS Automation
+Logs are in:
+  ~/Library/Logs/SMS Automation
+
+Delivery receipts
+-----------------
+SMS gateways can only report "Delivered" if they can reach this Mac from the
+internet. Without that, messages show as "Sent" (accepted by the gateway). Use
+a tunnel such as Cloudflare Tunnel or ngrok, then enter its address under
+Settings > General > Public URL.

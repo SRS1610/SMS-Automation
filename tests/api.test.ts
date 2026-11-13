@@ -1,4 +1,5 @@
-import type { AddressInfo } from 'node:net';
+import { request as httpRequest } from 'node:http';
+import { createServer as createNetServer, type AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createApp } from '../server/app';
@@ -7,7 +8,7 @@ import { openDb } from '../server/db';
 type Handler = (url: string, init: RequestInit) => { status: number; body: unknown } | Promise<{ status: number; body: unknown }>;
 
 /** Spins up the real app on an ephemeral port with an in-memory DB and a fake gateway network. */
-async function setup(opts: { password?: string; gateway?: Handler } = {}) {
+async function setup(opts: { password?: string; gateway?: Handler; desktop?: boolean; allowedHosts?: string[]; onQuit?: () => void; port?: number } = {}) {
   const calls: { url: string; body: string }[] = [];
   const gatewayFetch = (async (url: string, init: RequestInit = {}) => {
     calls.push({ url, body: String(init.body ?? '') });
@@ -18,12 +19,20 @@ async function setup(opts: { password?: string; gateway?: Handler } = {}) {
 
   const db = openDb(':memory:');
   const ctx = createApp({
-    config: { adminPassword: opts.password ?? null, appSecret: 'test-secret', webDir: '/nonexistent', secureCookies: false },
+    config: {
+      adminPassword: opts.password ?? null,
+      appSecret: 'test-secret',
+      webDir: '/nonexistent',
+      secureCookies: false,
+      desktop: opts.desktop,
+      allowedHosts: opts.allowedHosts,
+    },
     db,
     dispatcher: { fetch: gatewayFetch, backoffMs: () => 0, log: () => {} },
+    onQuit: opts.onQuit,
   });
   const server: Server = await new Promise((resolve) => {
-    const s = ctx.app.listen(0, () => resolve(s));
+    const s = ctx.app.listen(opts.port ?? 0, '127.0.0.1', () => resolve(s));
   });
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   let cookie = '';
@@ -282,11 +291,63 @@ describe('campaigns', () => {
 describe('authentication', () => {
   it('protects the API when ADMIN_PASSWORD is set', async () => {
     const t = await start({ password: 'hunter2' });
-    expect((await t.call('GET', '/api/session')).data).toEqual({ authRequired: true, authenticated: false });
+    expect((await t.call('GET', '/api/session')).data).toEqual({ authRequired: true, authenticated: false, desktop: false });
     expect((await t.call('GET', '/api/providers')).status).toBe(401);
     expect((await t.call('POST', '/api/login', { password: 'wrong' })).status).toBe(401);
     expect((await t.call('POST', '/api/login', { password: 'hunter2' })).status).toBe(200);
     expect((await t.call('GET', '/api/providers')).status).toBe(200);
     await t.call('POST', '/api/logout');
+  });
+});
+
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const srv = createNetServer();
+    srv.listen(0, '127.0.0.1', () => {
+      const { port } = srv.address() as AddressInfo;
+      srv.close(() => resolve(port));
+    });
+    srv.on('error', reject);
+  });
+}
+
+describe('desktop mode', () => {
+  /** fetch() can't override Host, so use node:http for DNS-rebinding style requests. */
+  function getWithHost(base: string, path: string, host: string): Promise<number> {
+    const url = new URL(path, base);
+    return new Promise((resolve, reject) => {
+      const req = httpRequest({ hostname: url.hostname, port: url.port, path: url.pathname, method: 'GET', headers: { Host: host } }, (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      });
+      req.on('error', reject);
+      req.end();
+    });
+  }
+
+  it('only answers the dashboard on allowed host names, but always accepts webhooks', async () => {
+    const port = await freePort();
+    const t = await start({ desktop: true, port, allowedHosts: [`127.0.0.1:${port}`, `localhost:${port}`] });
+    expect(await getWithHost(t.base, '/api/session', `127.0.0.1:${port}`)).toBe(200);
+    expect(await getWithHost(t.base, '/api/session', `localhost:${port}`)).toBe(200);
+    expect(await getWithHost(t.base, '/api/session', 'attacker.example')).toBe(403);
+    expect(await getWithHost(t.base, '/', 'attacker.example')).toBe(403);
+    // Webhooks come through tunnels under other names; they reach the (token-checked) webhook router.
+    expect(await getWithHost(t.base, '/webhooks/gw_x/token', 'tunnel.example.com')).toBe(404);
+  });
+
+  it('reports desktop mode and quits only with a JSON confirmation', async () => {
+    let quit = 0;
+    const t = await start({ desktop: true, onQuit: () => (quit += 1) });
+    expect((await t.call('GET', '/api/session')).data).toEqual({ authRequired: false, authenticated: true, desktop: true });
+    expect((await t.call('POST', '/api/app/quit', {})).status).toBe(400);
+    expect((await t.call('POST', '/api/app/quit', { confirm: true })).data).toEqual({ ok: true });
+    await new Promise((r) => setTimeout(r, 150));
+    expect(quit).toBe(1);
+  });
+
+  it('has no quit endpoint outside desktop mode', async () => {
+    const t = await start();
+    expect((await t.call('POST', '/api/app/quit', { confirm: true })).status).toBe(404);
   });
 });

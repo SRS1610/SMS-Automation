@@ -1,8 +1,8 @@
-import { Inbox, LayoutDashboard, LogOut, MessageSquare, Send, Settings as SettingsIcon } from 'lucide-react';
+import { Inbox, LayoutDashboard, LogOut, MessageSquare, Power, Send, Settings as SettingsIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import type { SessionInfo } from '../../shared/types';
 import { api, onUnauthorized } from './api';
-import { Loading } from './components/ui';
+import { ConfirmDialog, EmptyState, Loading } from './components/ui';
 import { GATEWAYS_CHANGED, useResource, useRoute } from './hooks';
 import { CampaignDetail } from './pages/CampaignDetail';
 import { Campaigns } from './pages/Campaigns';
@@ -49,9 +49,40 @@ function Page({ route }: { route: string }) {
   }
 }
 
+function QuitButton({ onQuit }: { onQuit: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  return (
+    <>
+      <button className="btn ghost sm" style={{ justifyContent: 'flex-start' }} onClick={() => setConfirming(true)}>
+        <Power size={14} /> Quit app
+      </button>
+      {confirming && (
+        <ConfirmDialog
+          title="Quit SMS Automation?"
+          confirmLabel="Quit"
+          busy={busy}
+          onCancel={() => setConfirming(false)}
+          onConfirm={async () => {
+            setBusy(true);
+            try {
+              await api.quitApp();
+            } finally {
+              onQuit();
+            }
+          }}
+        >
+          Sending stops while the app is closed. Unfinished and scheduled campaigns carry on the next time you open it.
+        </ConfirmDialog>
+      )}
+    </>
+  );
+}
+
 export function App() {
   const route = useRoute();
   const [session, setSession] = useState<SessionInfo | null>(null);
+  const [stopped, setStopped] = useState(false);
 
   const refreshSession = useCallback(() => {
     api
@@ -65,6 +96,15 @@ export function App() {
     return onUnauthorized(() => setSession((s) => (s ? { ...s, authenticated: false } : s)));
   }, [refreshSession]);
 
+  if (stopped) {
+    return (
+      <div className="login">
+        <EmptyState icon={<Power size={20} />} title="SMS Automation has stopped">
+          You can close this tab. Open the app again from your Applications folder to continue.
+        </EmptyState>
+      </div>
+    );
+  }
   if (!session) return <Loading />;
   if (!session.authenticated) return <Login onSuccess={setSession} />;
 
@@ -95,6 +135,7 @@ export function App() {
         </nav>
         <div className="sidebar-footer">
           <GatewayStatus route={route} />
+          {session.desktop && <QuitButton onQuit={() => setStopped(true)} />}
           {session.authRequired && (
             <button
               className="btn ghost sm"

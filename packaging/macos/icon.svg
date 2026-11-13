@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4c97ee"/>
+      <stop offset="1" stop-color="#1c5cab"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <!-- macOS icon grid: 824px body centred on a 1024px canvas -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)" filter="url(#shadow)"/>
+  <!-- speech bubble -->
+  <path d="M300 300h424a60 60 0 0 1 60 60v250a60 60 0 0 1-60 60H470l-120 96v-96h-50a60 60 0 0 1-60-60V360a60 60 0 0 1 60-60z" fill="#fff"/>
+  <!-- message lines -->
+  <rect x="330" y="402" width="364" height="44" rx="22" fill="#2a78d6"/>
+  <rect x="330" y="502" width="240" height="44" rx="22" fill="#2a78d6" opacity="0.55"/>
+  <!-- globe dot: worldwide -->
+  <circle cx="706" cy="680" r="96" fill="#0ca30c" stroke="#fff" stroke-width="22"/>
+  <path d="M706 596v168M622 680h168M706 596c-38 46-38 122 0 168M706 596c38 46 38 122 0 168" stroke="#fff" stroke-width="14" fill="none" stroke-linecap="round"/>
+</svg>

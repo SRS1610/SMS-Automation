@@ -13,6 +13,10 @@ export interface AppConfig {
   webDir: string;
   /** Cookies get the Secure flag (set when served over HTTPS). */
   secureCookies: boolean;
+  /** Running as the macOS desktop app: enables the Quit endpoint. */
+  desktop: boolean;
+  /** When set, only these Host headers may use the dashboard/API (blocks DNS-rebinding attacks on local installs). */
+  allowedHosts: string[];
 }
 
 function loadOrCreateSecret(dataDir: string): string {
@@ -35,5 +39,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     appSecret: env.APP_SECRET || loadOrCreateSecret(dataDir),
     webDir: path.resolve(env.WEB_DIR || './dist/web'),
     secureCookies: env.SECURE_COOKIES === 'true',
+    desktop: env.DESKTOP_MODE === '1',
+    allowedHosts: (env.ALLOWED_HOSTS ?? '')
+      .split(',')
+      .map((h) => h.trim().toLowerCase())
+      .filter(Boolean),
   };
 }

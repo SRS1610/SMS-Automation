@@ -16,19 +16,22 @@ import { SettingsStore } from './settings';
 import { SuppressionStore } from './suppressions';
 
 export interface AppOptions {
-  config: Pick<AppConfig, 'adminPassword' | 'appSecret' | 'webDir' | 'secureCookies'>;
+  config: Pick<AppConfig, 'adminPassword' | 'appSecret' | 'webDir' | 'secureCookies'> & Partial<Pick<AppConfig, 'desktop' | 'allowedHosts'>>;
   db: DB;
   dispatcher?: DispatcherOptions;
+  /** Called when the desktop app's Quit button is used. */
+  onQuit?: () => void;
 }
 
-export function createApp({ config, db, dispatcher: dispatcherOptions }: AppOptions) {
+export function createApp({ config, db, dispatcher: dispatcherOptions, onQuit }: AppOptions) {
   const box = new SecretBox(config.appSecret);
   const settings = new SettingsStore(db);
   const providers = new ProviderStore(db, box);
   const suppressions = new SuppressionStore(db);
   const campaigns = new CampaignStore(db, providers, settings, suppressions);
   const dispatcher = new Dispatcher({ db, providers, settings, campaigns, suppressions }, dispatcherOptions);
-  const auth = new Auth(config.adminPassword, box, config.secureCookies);
+  const auth = new Auth(config.adminPassword, box, config.secureCookies, !!config.desktop);
+  const allowedHosts = new Set(config.allowedHosts ?? []);
 
   const app = express();
   app.disable('x-powered-by');
@@ -40,6 +43,15 @@ export function createApp({ config, db, dispatcher: dispatcherOptions }: AppOpti
     next();
   });
 
+  // Gateways reach /webhooks through a tunnel or proxy under another host name, so only the
+  // dashboard and API are pinned to the allowed hosts.
+  if (allowedHosts.size > 0) {
+    app.use((req, res, next) => {
+      if (req.path.startsWith('/webhooks/') || allowedHosts.has((req.headers.host ?? '').toLowerCase())) return next();
+      res.status(403).type('text/plain').send('Host not allowed');
+    });
+  }
+
   app.use('/webhooks', webhookRoutes({ providers, campaigns, log: (m) => console.error(`[webhooks] ${m}`) }));
 
   const api = express.Router();
@@ -47,6 +59,17 @@ export function createApp({ config, db, dispatcher: dispatcherOptions }: AppOpti
   api.use(auth.routes());
   api.use(auth.middleware());
   api.use(apiRoutes({ providers, campaigns, settings, suppressions, dispatcher }));
+  if (config.desktop) {
+    api.post('/app/quit', (req, res) => {
+      // Requiring a JSON body forces a CORS preflight, so other websites can't trigger this.
+      if (req.body?.confirm !== true) {
+        res.status(400).json({ error: 'Missing confirmation' });
+        return;
+      }
+      res.json({ ok: true });
+      setTimeout(() => onQuit?.(), 100);
+    });
+  }
   api.use((_req, res) => {
     res.status(404).json({ error: 'Not found' });
   });

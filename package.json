@@ -15,6 +15,7 @@
     "build:web": "vite build",
     "build:server": "esbuild server/index.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=build/server.js",
     "start": "node --disable-warning=ExperimentalWarning build/server.js",
+    "package:mac": "npm run build:web && node scripts/build-macos-app.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest"

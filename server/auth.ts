@@ -31,6 +31,7 @@ export class Auth {
     private readonly password: string | null,
     private readonly box: SecretBox,
     private readonly secureCookies: boolean,
+    private readonly desktop = false,
   ) {}
 
   get enabled(): boolean {
@@ -52,7 +53,7 @@ export class Auth {
   }
 
   session(req: Request): SessionInfo {
-    return { authRequired: this.enabled, authenticated: this.isAuthenticated(req) };
+    return { authRequired: this.enabled, authenticated: this.isAuthenticated(req), desktop: this.desktop };
   }
 
   private rateLimited(ip: string): boolean {
@@ -94,12 +95,12 @@ export class Auth {
         maxAge: SESSION_TTL_MS,
         path: '/',
       });
-      res.json({ authRequired: true, authenticated: true } satisfies SessionInfo);
+      res.json({ authRequired: true, authenticated: true, desktop: this.desktop } satisfies SessionInfo);
     });
 
     router.post('/logout', (_req, res) => {
       res.clearCookie(COOKIE, { path: '/' });
-      res.json({ authRequired: this.enabled, authenticated: !this.enabled } satisfies SessionInfo);
+      res.json({ authRequired: this.enabled, authenticated: !this.enabled, desktop: this.desktop } satisfies SessionInfo);
     });
     return router;
   }

@@ -162,6 +162,8 @@ export interface Overview {
 export interface SessionInfo {
   authRequired: boolean;
   authenticated: boolean;
+  /** Running as the local desktop app (shows a Quit button). */
+  desktop?: boolean;
 }
 
 export function emptyCounts(): StatusCounts {

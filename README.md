@@ -55,6 +55,35 @@ ADMIN_PASSWORD='choose-a-strong-password' npm start
 This serves the dashboard and API on one port (default 3000). Put it behind
 HTTPS (nginx, Caddy, a load balancer...) and set `SECURE_COOKIES=true`.
 
+### Mac app (DMG)
+
+```bash
+npm run package:mac
+```
+
+This builds `build/macos/SMS-Automation-<version>.dmg`, a drag-to-Applications
+installer for a self-contained **SMS Automation.app**. The app bundles the
+dashboard, the server and an official Node.js runtime for both Apple Silicon and
+Intel Macs (macOS 11 or later), so nothing else needs to be installed.
+
+- Double-clicking the app starts the server in the background on
+  `127.0.0.1:47821` and opens the dashboard in your default browser. Double-click
+  it again to reopen the dashboard; use **Quit app** in the sidebar to stop it.
+- Data lives in `~/Library/Application Support/SMS Automation`, logs in
+  `~/Library/Logs/SMS Automation`.
+- Only that Mac can reach the dashboard. It answers only on `127.0.0.1` and
+  `localhost` (protecting it from DNS-rebinding attacks by websites), so no
+  password is needed.
+- The app isn't signed with an Apple Developer ID, so the first launch needs
+  **System Settings → Privacy & Security → Open Anyway** (macOS 15+) or
+  right-click → **Open** (macOS 14 and earlier). `How to install.txt` in the DMG
+  explains this. To remove that step, sign and notarize the app with your own
+  Developer ID.
+
+The build works on macOS (with `hdiutil`) and on Linux, where it needs `xorriso`
+and writes the DMG itself (`scripts/macos/udif.mjs`). Set `MAC_NODE_VERSION`
+(default: latest 22.x) or `MAC_ARCHS` (`arm64,x64`) to change what's bundled.
+
 ## Configuration
 
 Copy `.env.example` and set the variables in your environment (the app doesn't
@@ -69,6 +98,7 @@ load `.env` files itself; use your process manager, Docker, or `node --env-file`
 | `DATA_DIR` | `./data` | Holds `sms.db` (SQLite) and the generated secret. Back this directory up. |
 | `SECURE_COOKIES` | `false` | Set to `true` when served over HTTPS. |
 | `WEB_DIR` | `./dist/web` | Where the built dashboard is served from. |
+| `ALLOWED_HOSTS` | unset | Comma-separated `host:port` values the dashboard answers to; other Host headers get 403. Webhooks are exempt. |
 
 Everything else is set in the dashboard under **Settings → General**: default
 country for local-format numbers, default sender ID, opt-out footer, attempts
@@ -144,6 +174,8 @@ server/            Express API, dispatcher and gateway adapters
 shared/            Code used by both server and browser:
                    SMS segment maths, phone normalisation, templating, routing
 web/src/           React dashboard (Dashboard, Send SMS, Campaigns, Settings)
+packaging/macos/   Mac app launcher, icon and DMG read-me
+scripts/           Mac app/DMG build (build-macos-app.mjs, macos/udif.mjs)
 tests/             Vitest unit and API tests
 ```
 

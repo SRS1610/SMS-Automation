@@ -4,21 +4,21 @@ import { openDb } from './db';
 
 const config = loadConfig();
 const db = openDb(config.dbFile);
-const { app, dispatcher } = createApp({ config, db });
+const { app, dispatcher } = createApp({ config, db, onQuit: () => void shutdown('Quit from the dashboard') });
 
 dispatcher.start();
 const server = app.listen(config.port, config.host, () => {
   console.log(`SMS Automation listening on http://localhost:${config.port}`);
-  if (!config.adminPassword) {
+  if (!config.adminPassword && !config.desktop) {
     console.warn('ADMIN_PASSWORD is not set: the dashboard is open to anyone who can reach this port.');
   }
 });
 
 let shuttingDown = false;
-async function shutdown(signal: string) {
+async function shutdown(reason: string) {
   if (shuttingDown) return;
   shuttingDown = true;
-  console.log(`${signal} received, finishing in-flight messages…`);
+  console.log(`Shutting down (${reason}), finishing in-flight messages…`);
   server.close();
   await dispatcher.stop();
   db.close();

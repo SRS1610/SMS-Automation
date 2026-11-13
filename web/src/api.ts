@@ -76,6 +76,7 @@ export const api = {
   session: () => request<SessionInfo>('GET', '/session'),
   login: (password: string) => request<SessionInfo>('POST', '/login', { password }),
   logout: () => request<SessionInfo>('POST', '/logout'),
+  quitApp: () => request<{ ok: boolean }>('POST', '/app/quit', { confirm: true }),
 
   providerTypes: () => request<ProviderTypeInfo[]>('GET', '/provider-types'),
   countries: () => request<CountryInfo[]>('GET', '/countries'),
